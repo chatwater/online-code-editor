@@ -1,54 +1,61 @@
 # Online Code Editor
 
-一个支持多种编程语言的在线代码编辑器，类似于 LeetCode 的编程环境。使用 React + TypeScript + Vite 构建前端，Node.js + Express 构建后端。
+An online code editor supporting multiple programming languages, similar to LeetCode's programming environment. Built with React + TypeScript + Vite for the frontend and Node.js + Express for the backend.
 
-## 功能特点
+## Features
 
-- 支持多种编程语言：
+- Multiple Programming Languages Support:
   - Python
   - JavaScript
   - Java
   - C++
-- 实时代码编辑
-- 代码执行
-- 输入/输出支持
-- 响应式设计
-- 语法高亮
-- 暗色主题
+- Real-time Code Editing
+- Code Execution
+- Input/Output Support
+- Responsive Design
+- Syntax Highlighting
+- Theme Switching (Light/Dark)
+- Fullscreen Mode
+- Code Compilation
+- Copy to Clipboard
+- Environment Configuration
 
-## 技术栈
+## Tech Stack
 
-### 前端
+### Frontend
 - React 18
 - TypeScript
 - Vite
-- Monaco Editor (VS Code 的编辑器)
+- Monaco Editor (VS Code's editor)
 - Tailwind CSS
 - DaisyUI
 - Axios
+- Heroicons
 
-### 后端
+### Backend
 - Node.js
 - Express
 - TypeScript
 - UUID
 
-## 项目结构
+## Project Structure
 
 ```
 online-code-editor/
-├── frontend/           # 前端项目
-│   ├── src/           # 源代码
-│   ├── public/        # 静态资源
-│   └── ...           # 配置文件
-└── backend/           # 后端项目
-    ├── src/          # 源代码
-    └── ...          # 配置文件
+├── frontend/           # Frontend project
+│   ├── src/           # Source code
+│   │   ├── components/  # React components
+│   │   └── config/     # Configuration files
+│   ├── public/        # Static assets
+│   └── ...           # Config files
+└── backend/           # Backend project
+    ├── src/          # Source code
+    └── ...          # Config files
 ```
 
-## 快速开始
+## Quick Start
 
-### 前端
+### Frontend
 
 ```bash
 cd frontend
@@ -56,9 +63,9 @@ npm install
 npm run dev
 ```
 
-前端将在 http://localhost:5173 运行
+Frontend will run at http://localhost:3000
 
-### 后端
+### Backend
 
 ```bash
 cd backend
@@ -66,21 +73,44 @@ npm install
 npm run dev
 ```
 
-后端将在 http://localhost:3001 运行
+Backend will run at http://localhost:3001
 
-## 开发环境要求
+## Environment Configuration
+
+The project uses environment variables for configuration:
+
+- `.env.development` - Development environment settings
+- `.env.production` - Production environment settings
+
+## Development Requirements
 
 - Node.js >= 18
 - npm >= 9
-- Python 3.x (用于运行 Python 代码)
-- Java JDK (用于运行 Java 代码)
-- G++ (用于运行 C++ 代码)
+- Python 3.x (for running Python code)
+- Java JDK (for running Java code)
+- G++ (for running C++ code)
 
-## 作者
+## Version History
+
+### v2.0
+- Added code compilation feature
+- Added theme switching
+- Added fullscreen mode
+- Added copy to clipboard functionality
+- Improved error handling
+- Added environment configuration
+
+### v1.0
+- Basic code editor functionality
+- Multiple language support
+- Input/Output handling
+- Syntax highlighting
+
+## Author
 
 - chatwater
 - Cursor
 
-## 许可证
+## License
 
 MIT 
