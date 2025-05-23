@@ -38,7 +38,8 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 # Temporary files
-temp/
+temp/*
+!temp/.gitkeep
 *.tmp
 *.temp
 
