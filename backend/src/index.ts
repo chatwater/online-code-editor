@@ -1,120 +1,172 @@
 import express from 'express';
 import cors from 'cors';
-import { exec } from 'child_process';
-import { writeFile, unlink, mkdir } from 'fs/promises';
-import { join } from 'path';
+import { exec, spawn } from 'child_process';
+import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import fs from 'fs';
 
+const execAsync = promisify(exec);
 const app = express();
 const port = 3001;
 
 app.use(cors());
 app.use(express.json());
 
-// 使用绝对路径创建临时目录
-const tempDir = join(process.cwd(), 'temp');
-mkdir(tempDir, { recursive: true }).catch(console.error);
+// 确保临时目录存在
+const tempDir = path.join(__dirname, '../temp');
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir);
+}
 
-const executeCode = async (language: string, code: string, input: string): Promise<string> => {
-  const fileName = uuidv4();
-  let filePath = '';
-  let command = '';
-  let className = '';
-
-  switch (language) {
-    case 'python':
-      filePath = join(tempDir, `${fileName}.py`);
-      command = `python3 ${filePath}`;
-      break;
-    case 'javascript':
-      filePath = join(tempDir, `${fileName}.js`);
-      command = `node ${filePath}`;
-      break;
-    case 'java':
-      // 使用有效的类名（以字母开头，只包含字母和数字）
-      const uuidPart = fileName.replace(/[^a-zA-Z0-9]/g, '');
-      className = `JavaClass${uuidPart}`;
-      // 使用类名作为文件名
-      filePath = join(tempDir, `${className}.java`);
-      // 修改 Java 代码，将类名改为有效的名称
-      const modifiedCode = code.replace(/public\s+class\s+\w+/, `public class ${className}`);
-      command = `javac ${filePath} && java -cp ${tempDir} ${className}`;
-      code = modifiedCode;
-      break;
-    case 'cpp':
-      filePath = join(tempDir, `${fileName}.cpp`);
-      command = `g++ ${filePath} -o ${join(tempDir, fileName)} && ${join(tempDir, fileName)}`;
-      break;
-    default:
-      throw new Error('Unsupported language');
-  }
-
+// 清理临时文件
+const cleanupTempFiles = async (filePath: string) => {
   try {
-    await writeFile(filePath, code);
-    return new Promise((resolve, reject) => {
-      const process = exec(command, (error, stdout, stderr) => {
-        // 先清理文件
-        cleanupFiles(language, filePath, className).catch(console.error);
-        
-        if (error) {
-          reject(error.message);
-        } else {
-          resolve(stdout || stderr);
-        }
-      });
-
-      if (input) {
-        process.stdin?.write(input);
-        process.stdin?.end();
-      }
-    });
-  } catch (error) {
-    // 确保在出错时也清理文件
-    await cleanupFiles(language, filePath, className).catch(console.error);
-    throw error;
-  }
-};
-
-const cleanupFiles = async (language: string, filePath: string, className?: string) => {
-  try {
-    await unlink(filePath);
-    
-    if (language === 'java') {
-      await unlink(join(tempDir, `${className}.class`));
-    } else if (language === 'cpp') {
-      const fileName = filePath.split('/').pop()?.replace('.cpp', '');
-      if (fileName) {
-        await unlink(join(tempDir, fileName));
-      }
+    if (fs.existsSync(filePath)) {
+      await fs.promises.unlink(filePath);
+    }
+    // 对于 C++ 和 Java，还需要删除编译后的文件
+    const execPath = filePath.replace(/\.[^.]+$/, '');
+    if (fs.existsSync(execPath)) {
+      await fs.promises.unlink(execPath);
     }
   } catch (error) {
     console.error('Error cleaning up files:', error);
   }
 };
 
-const getFileExtension = (language: string): string => {
-  switch (language) {
-    case 'python': return 'py';
-    case 'javascript': return 'js';
-    case 'java': return 'java';
-    case 'cpp': return 'cpp';
-    default: throw new Error('Unsupported language');
-  }
-};
-
-app.post('/run', async (req, res) => {
-  const { language, code, input } = req.body;
-
-  if (!language || !code) {
-    return res.status(400).json({ error: 'Language and code are required' });
-  }
+// 编译接口
+app.post('/compile', async (req, res) => {
+  const { language } = req.body;
+  let { code } = req.body;  // 使用 let 声明，因为我们需要修改它
+  const fileId = uuidv4();
+  let filePath = '';
+  let compileCommand = '';
+  let success = false;
+  let output = '';
 
   try {
-    const output = await executeCode(language, code, input || '');
+    switch (language) {
+      case 'cpp':
+        filePath = path.join(tempDir, `${fileId}.cpp`);
+        compileCommand = `g++ ${filePath} -o ${path.join(tempDir, fileId)}`;
+        break;
+      case 'java':
+        // 生成有效的 Java 类名（只使用字母和数字）
+        const className = `JavaClass${fileId.replace(/[^a-zA-Z0-9]/g, '')}`;
+        // 修改 Java 代码，将类名改为有效的名称
+        code = code.replace(/public\s+class\s+\w+/, `public class ${className}`);
+        filePath = path.join(tempDir, `${className}.java`);
+        compileCommand = `javac ${filePath}`;
+        break;
+      default:
+        return res.status(400).json({ error: 'Unsupported language for compilation' });
+    }
+
+    // 写入代码到文件
+    await fs.promises.writeFile(filePath, code);
+
+    // 执行编译命令
+    const { stdout, stderr } = await execAsync(compileCommand);
+    output = stdout || stderr;
+    success = !stderr;
+
+    res.json({ success, output });
+  } catch (error: any) {
+    output = error.stderr || error.message;
+    success = false;
+    res.json({ success, output });
+  } finally {
+    // 清理临时文件
+    await cleanupTempFiles(filePath);
+  }
+});
+
+// 运行接口
+app.post('/run', async (req, res) => {
+  const { language, code, input } = req.body;
+  const fileId = uuidv4();
+  let filePath = '';
+  let runCommand = '';
+  let output = '';
+
+  try {
+    switch (language) {
+      case 'cpp':
+        filePath = path.join(tempDir, `${fileId}.cpp`);
+        await fs.promises.writeFile(filePath, code);
+        await execAsync(`g++ ${filePath} -o ${path.join(tempDir, fileId)}`);
+        runCommand = path.join(tempDir, fileId);
+        break;
+      case 'python':
+        filePath = path.join(tempDir, `${fileId}.py`);
+        await fs.promises.writeFile(filePath, code);
+        runCommand = `python3 ${filePath}`;
+        break;
+      case 'javascript':
+        filePath = path.join(tempDir, `${fileId}.js`);
+        await fs.promises.writeFile(filePath, code);
+        runCommand = `node ${filePath}`;
+        break;
+      case 'java':
+        // 生成有效的 Java 类名（只使用字母和数字）
+        const className = `JavaClass${fileId.replace(/[^a-zA-Z0-9]/g, '')}`;
+        // 修改 Java 代码，将类名改为有效的名称
+        const modifiedCode = code.replace(/public\s+class\s+\w+/, `public class ${className}`);
+        filePath = path.join(tempDir, `${className}.java`);
+        await fs.promises.writeFile(filePath, modifiedCode);
+        await execAsync(`javac ${filePath}`);
+        runCommand = `java -cp ${tempDir} ${className}`;
+        break;
+      default:
+        return res.status(400).json({ error: 'Unsupported language' });
+    }
+
+    // 使用 spawn 来处理输入
+    const [command, ...args] = runCommand.split(' ');
+    const process = spawn(command, args);
+    
+    let stdout = '';
+    let stderr = '';
+
+    process.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    process.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    // 如果有输入，写入到进程的标准输入
+    if (input) {
+      process.stdin.write(input);
+      process.stdin.end();
+    }
+
+    // 等待进程结束
+    await new Promise((resolve, reject) => {
+      process.on('error', (err) => {
+        reject(new Error(`Failed to start process: ${err.message}`));
+      });
+
+      process.on('close', (code) => {
+        if (code === 0) {
+          resolve(stdout);
+        } else {
+          reject(new Error(stderr || `Process exited with code ${code}`));
+        }
+      });
+    });
+
+    output = stdout || stderr;
     res.json({ output });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Execution error:', error);
-    res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    output = error.message || 'Unknown error occurred';
+    res.json({ output });
+  } finally {
+    // 清理临时文件
+    await cleanupTempFiles(filePath);
   }
 });
 
