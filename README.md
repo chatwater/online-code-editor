@@ -1,5 +1,7 @@
 # Online Code Editor
 
+![Project Preview](frontend/src/assets/preview.jpg)
+
 An online code editor supporting multiple programming languages, similar to LeetCode's programming environment. Built with React + TypeScript + Vite for the frontend and Node.js + Express for the backend.
 
 ## Features

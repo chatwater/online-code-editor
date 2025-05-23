@@ -1,5 +1,7 @@
 # 在线代码编辑器
 
+![项目首页预览](frontend/src/assets/preview.jpg)
+
 一个支持多种编程语言的在线代码编辑器，类似于 LeetCode 的编程环境。使用 React + TypeScript + Vite 构建前端，Node.js + Express 构建后端。
 
 ## 功能特点
